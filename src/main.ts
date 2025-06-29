@@ -160,7 +160,7 @@ export const tmdbApi = process.env.TMDB_KEY && process.env.TMDB_KEY;
       if (decodedUrl.endsWith('.m3u8')) {
         let playlist = response.data;
         playlist = playlist.replace(/(https?:\/\/[^\s\n\r]+)/g, (match: any) => {
-          return `https://consumet-api.vercel.app/proxy?url=${encodeURIComponent(match)}`;
+          return `https://consumet-updated.vercel.app/proxy?url=${encodeURIComponent(match)}`;
         });
         reply.header('Content-Type', 'application/vnd.apple.mpegurl');
         reply.header('Access-Control-Allow-Origin', '*');
