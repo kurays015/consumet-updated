@@ -3,11 +3,12 @@ import Redis from 'ioredis';
 import Fastify from 'fastify';
 import FastifyCors from '@fastify/cors';
 import fs from 'fs';
+import axios from 'axios';
 
 import books from './routes/books';
 import anime from './routes/anime';
 import manga from './routes/manga';
-import comics from './routes/comics';
+// import comics from './routes/comics';
 import lightnovels from './routes/light-novels';
 import movies from './routes/movies';
 import meta from './routes/meta';
@@ -142,12 +143,46 @@ export const tmdbApi = process.env.TMDB_KEY && process.env.TMDB_KEY;
 
   await fastify.register(Utils, { prefix: '/utils' });
 
+  fastify.get('/proxy', async (request, reply) => {
+    const url = request.query as string;
+    if (!url) return reply.status(400).send({ error: 'URL not valid' });
+
+    try {
+      const decodedUrl = decodeURIComponent(url);
+      const response = await axios.get(decodedUrl, {
+        responseType: decodedUrl.endsWith('.m3u8') ? 'text' : 'stream',
+        headers: {
+          Referer: 'https://kwik.si/',
+          Origin: 'https://kwik.si/',
+        },
+      });
+
+      if (decodedUrl.endsWith('.m3u8')) {
+        let playlist = response.data;
+        playlist = playlist.replace(/(https?:\/\/[^\s\n\r]+)/g, (match: any) => {
+          return `https://consumet-api.vercel.app/proxy?url=${encodeURIComponent(match)}`;
+        });
+        reply.header('Content-Type', 'application/vnd.apple.mpegurl');
+        reply.header('Access-Control-Allow-Origin', '*');
+        return reply.send(playlist);
+      }
+
+      reply.header('Content-Type', response.headers['content-type']);
+      reply.header('Access-Control-Allow-Origin', '*');
+      return reply.send(response.data);
+    } catch (error: any) {
+      console.error('Proxy error:', error.message);
+      return reply.status(500).send({ error: 'Proxy failed' });
+    }
+  });
+
   try {
     fastify.get('/', (_, rp) => {
       rp.status(200).send(
-        `Welcome to consumet api! 🎉 \n${process.env.NODE_ENV === 'DEMO'
-          ? 'This is a demo of the api. You should only use this for testing purposes.'
-          : ''
+        `Welcome to consumet api! 🎉 \n${
+          process.env.NODE_ENV === 'DEMO'
+            ? 'This is a demo of the api. You should only use this for testing purposes.'
+            : ''
         }`,
       );
     });
@@ -168,6 +203,6 @@ export const tmdbApi = process.env.TMDB_KEY && process.env.TMDB_KEY;
   }
 })();
 export default async function handler(req: any, res: any) {
-  await fastify.ready()
-  fastify.server.emit('request', req, res)
+  await fastify.ready();
+  fastify.server.emit('request', req, res);
 }
